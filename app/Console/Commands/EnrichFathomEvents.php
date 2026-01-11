@@ -22,13 +22,13 @@ class EnrichFathomEvents extends Command
             INNER JOIN (
                 SELECT
                     json_extract(response_data, '$.event_id') as event_id,
-                    MAX(julianday(end_date) - julianday(start_date)) as max_days
+                    MAX(DATEDIFF(end_date, start_date)) as max_days
                 FROM fathom_api_responses
                 WHERE aggregation_type = 'event'
                 GROUP BY json_extract(response_data, '$.event_id')
             ) latest
             ON json_extract(far.response_data, '$.event_id') = latest.event_id
-            AND (julianday(far.end_date) - julianday(far.start_date)) = latest.max_days
+            AND DATEDIFF(far.end_date, far.start_date) = latest.max_days
             WHERE far.aggregation_type = 'event'
         ");
 
