@@ -21,7 +21,7 @@ return new class extends Migration
             $table->timestamp('fetched_at');
             $table->timestamps();
 
-            $table->index(['site_id', 'aggregation_type', 'start_date', 'end_date']);
+            $table->index(['site_id', 'aggregation_type', 'start_date', 'end_date'], 'fathom_api_site_agg_dates_idx');
         });
     }
 
