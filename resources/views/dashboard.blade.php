@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Affiliate Control</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-[#1a1d2e] min-h-screen text-slate-100 font-sans antialiased">
+
+    <x-sidebar />
+
+    <!-- Main Canvas -->
+    <main class="ml-20 p-10" x-data="{
+        period: new URLSearchParams(window.location.search).get('period') || '30d',
+        chartMetric: new URLSearchParams(window.location.search).get('chartMetric') || 'commission',
+        statuses: (() => {
+            const params = new URLSearchParams(window.location.search);
+            const statusParams = params.getAll('statuses[]');
+            return statusParams.length > 0 ? statusParams : ['Geaccepteerd', 'Open'];
+        })(),
+        periods: {
+            '7d': { label: '7d' },
+            '30d': { label: '30d' },
+            '90d': { label: '90d' },
+            '365d': { label: '1y' },
+            'all-time': { label: 'All' }
+        },
+        metrics: {
+            'commission': { label: 'Commissie', color: 'rgb(139, 92, 246)', prefix: '€' },
+            'visitors': { label: 'Visitors', color: 'rgb(34, 197, 94)', prefix: '' },
+            'pageviews': { label: 'Pageviews', color: 'rgb(59, 130, 246)', prefix: '' },
+            'clicks': { label: 'Affiliate Clicks', color: 'rgb(249, 115, 22)', prefix: '' }
+        },
+        changePeriod(newPeriod) {
+            const params = new URLSearchParams(window.location.search);
+            params.set('period', newPeriod);
+            window.location.href = '/?' + params.toString();
+        },
+        changeChartMetric(metric) {
+            const params = new URLSearchParams(window.location.search);
+            params.set('chartMetric', metric);
+            window.location.href = '/?' + params.toString();
+        },
+        applyFilters() {
+            const params = new URLSearchParams(window.location.search);
+            params.delete('statuses[]');
+            this.statuses.forEach(status => params.append('statuses[]', status));
+            window.location.href = '/?' + params.toString();
+        }
+    }">
+
+        <!-- Header with Period Selector on Right -->
+        <div class="flex items-start justify-between mb-8">
+            <div>
+                <h1 class="text-4xl font-light text-slate-100 mb-2">Dashboard</h1>
+                <p class="text-slate-400">Waar moet je nu op focussen om meer te verdienen?</p>
+            </div>
+
+            <!-- Period Selector - Right Top -->
+            <div class="flex gap-2">
+                <template x-for="(periodData, periodKey) in periods" :key="periodKey">
+                    <button
+                        @click="changePeriod(periodKey)"
+                        :class="period === periodKey ? 'bg-lavender text-white shadow-lg shadow-lavender/30' : 'bg-[#252839] text-slate-400 hover:bg-[#2d3048]'"
+                        class="px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium"
+                        x-text="periodData.label"
+                    ></button>
+                </template>
+            </div>
+        </div>
+
+        @foreach(['7d', '30d', '90d', '365d', 'all-time'] as $periodKey)
+        <div x-show="period === '{{ $periodKey }}'" x-transition x-cloak>
+            @php
+                $metrics = $metricsData[$periodKey] ?? null;
+                $dailyData = $dailyMetricsData[$periodKey] ?? collect();
+            @endphp
+
+            @if($metrics)
+            <!-- Main Grid: Chart Left (Larger), Metrics Right -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+
+                <!-- LEFT: Chart - Takes 2 columns -->
+                <div class="lg:col-span-2 bg-[#252839] backdrop-blur-light rounded-xl shadow-lg border border-slate-700/20 flex flex-col">
+                    <!-- Chart Metric Switcher -->
+                    <div class="flex gap-2 p-6 pb-4">
+                        <template x-for="(metricData, metricKey) in metrics" :key="metricKey">
+                            <button
+                                @click="chartMetric = metricKey; window['updateChart{{ str_replace('-', '', $periodKey) }}'](metricKey)"
+                                :class="chartMetric === metricKey ? 'bg-lavender text-white shadow-md' : 'bg-[#1a1d2e] text-slate-400 hover:bg-[#2d3048]'"
+                                class="px-3 py-1.5 rounded-lg transition-all duration-200 text-xs font-medium"
+                                x-text="metricData.label"
+                            ></button>
+                        </template>
+                    </div>
+                    <div class="flex-1 px-6 pb-6">
+                        <canvas id="chart-{{ $periodKey }}"></canvas>
+                    </div>
+                </div>
+
+                <!-- RIGHT: Metrics - Takes 1 column -->
+                <div class="flex flex-col gap-4">
+                    <!-- Commission Card -->
+                    <div class="bg-gradient-to-br from-[#2d3048] to-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20 flex-1">
+                        <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">COMMISSIE</p>
+                        <p class="text-5xl font-light text-white mb-4">€{{ number_format($metrics->commission, 2, '.', '') }}</p>
+
+                        <!-- Order Status Checkboxes -->
+                        <div class="mb-4">
+                            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">ORDER STATUS</p>
+                            <div class="flex flex-col gap-2">
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="checkbox"
+                                           x-model="statuses"
+                                           value="Geaccepteerd"
+                                           class="w-4 h-4 rounded bg-[#1a1d2e] border-slate-600 text-lavender focus:ring-lavender focus:ring-offset-0 transition-colors">
+                                    <span class="text-sm text-slate-300 group-hover:text-slate-200 transition-colors">Geaccepteerd</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="checkbox"
+                                           x-model="statuses"
+                                           value="Open"
+                                           class="w-4 h-4 rounded bg-[#1a1d2e] border-slate-600 text-lavender focus:ring-lavender focus:ring-offset-0 transition-colors">
+                                    <span class="text-sm text-slate-300 group-hover:text-slate-200 transition-colors">In behandeling</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="checkbox"
+                                           x-model="statuses"
+                                           value="Geweigerd"
+                                           class="w-4 h-4 rounded bg-[#1a1d2e] border-slate-600 text-lavender focus:ring-lavender focus:ring-offset-0 transition-colors">
+                                    <span class="text-sm text-slate-300 group-hover:text-slate-200 transition-colors">Afgekeurd</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button @click="applyFilters()"
+                                class="w-full bg-lavender hover:bg-lavender/90 text-white py-2.5 rounded-lg transition-all duration-200 text-sm font-medium shadow-lg shadow-lavender/30">
+                            Toepassen
+                        </button>
+                    </div>
+
+                    <!-- Orders & Visitors Row -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 shadow-lg border border-slate-700/20">
+                            <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Orders</p>
+                            <p class="text-3xl font-light text-white">{{ number_format($metrics->orders) }}</p>
+                        </div>
+                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 shadow-lg border border-slate-700/20">
+                            <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Visitors</p>
+                            <p class="text-3xl font-light text-white">{{ number_format($metrics->visitors) }}</p>
+                        </div>
+                    </div>
+
+                    <!-- RPV & Average per Day Row -->
+                    @php
+                        $days = match($periodKey) {
+                            '7d' => 7,
+                            '30d' => 30,
+                            '90d' => 90,
+                            '365d' => 365,
+                            'all-time' => $dailyData->count(),
+                            default => 30
+                        };
+                        $avgPerDay = $days > 0 ? $metrics->commission / $days : 0;
+                    @endphp
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 shadow-lg border border-slate-700/20">
+                            <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">RPV</p>
+                            <p class="text-3xl font-light text-white">€{{ number_format($metrics->rpv, 3, '.', '') }}</p>
+                        </div>
+                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 shadow-lg border border-slate-700/20">
+                            <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Gem. per Dag</p>
+                            <p class="text-3xl font-light text-white">€{{ number_format($avgPerDay, 2, '.', '') }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Metrics Row -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
+                    <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Pageviews</p>
+                    <p class="text-3xl font-light text-white">{{ number_format($metrics->pageviews) }}</p>
+                </div>
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
+                    <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Affiliate Clicks</p>
+                    <p class="text-3xl font-light text-white">{{ number_format($metrics->clicks) }}</p>
+                </div>
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
+                    <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">CTR</p>
+                    <p class="text-3xl font-light text-white">{{ $metrics->pageviews > 0 ? number_format(($metrics->clicks / $metrics->pageviews) * 100, 1) : 0 }}%</p>
+                </div>
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
+                    <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Conversie</p>
+                    <p class="text-3xl font-light text-white">{{ number_format($metrics->conversion_rate, 1) }}%</p>
+                </div>
+            </div>
+
+            <!-- Bottom: Top Performers & Worst Sites -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Top Performers -->
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-1 h-6 bg-emerald-500 rounded-full"></div>
+                        <h2 class="text-xl font-light text-slate-100">Top Performers</h2>
+                    </div>
+                    <div class="space-y-2">
+                        @forelse($topSitesData[$periodKey] ?? [] as $index => $site)
+                        <div class="py-3 border-b border-slate-700/20 hover:bg-[#1a1d2e]/50 transition-colors px-3 rounded">
+                            <div class="flex items-start justify-between mb-2">
+                                <div class="flex items-start gap-3 flex-1">
+                                    <span class="text-xs font-semibold text-slate-500 w-4 mt-1">{{ $index + 1 }}</span>
+                                    <div class="flex-1">
+                                        <p class="text-slate-200 font-medium">{{ $site->name }}</p>
+                                        <p class="text-xs text-slate-500">{{ $site->domain }}</p>
+                                    </div>
+                                </div>
+                                <p class="text-emerald-400 font-semibold text-lg">€{{ number_format($site->commission, 2, ',', '.') }}</p>
+                            </div>
+                            <div class="flex gap-4 ml-7 text-xs">
+                                <span class="text-slate-400">
+                                    <span class="text-slate-500">Orders:</span>
+                                    <span class="text-slate-300 font-medium">{{ $site->orders }}</span>
+                                </span>
+                                <span class="text-slate-400">
+                                    <span class="text-slate-500">RPV:</span>
+                                    <span class="text-slate-300 font-medium">€{{ number_format($site->rpv, 3, ',', '.') }}</span>
+                                </span>
+                                <span class="text-slate-400">
+                                    <span class="text-slate-500">Bezoekers:</span>
+                                    <span class="text-slate-300 font-medium">{{ number_format($site->visitors) }}</span>
+                                </span>
+                            </div>
+                        </div>
+                        @empty
+                        <p class="text-slate-500 text-center py-8">Geen data</p>
+                        @endforelse
+                    </div>
+                </div>
+
+                <!-- Lowest RPV (Optimization Opportunities) -->
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-1 h-6 bg-amber-500 rounded-full"></div>
+                        <h2 class="text-xl font-light text-slate-100">Optimization Opportunities</h2>
+                    </div>
+                    <div class="space-y-2">
+                        @forelse($worstSitesData[$periodKey] ?? [] as $index => $site)
+                        <div class="py-3 border-b border-slate-700/20 hover:bg-[#1a1d2e]/50 transition-colors px-3 rounded">
+                            <div class="flex items-start justify-between mb-2">
+                                <div class="flex items-start gap-3 flex-1">
+                                    <span class="text-xs font-semibold text-slate-500 w-4 mt-1">{{ $index + 1 }}</span>
+                                    <div class="flex-1">
+                                        <p class="text-slate-200 font-medium">{{ $site->name }}</p>
+                                        <p class="text-xs text-slate-500">{{ $site->domain }}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-amber-400 font-semibold text-lg">€{{ number_format($site->rpv, 3, ',', '.') }}</p>
+                                    <p class="text-xs text-slate-500">RPV</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4 ml-7 text-xs">
+                                <span class="text-slate-400">
+                                    <span class="text-slate-500">Bezoekers:</span>
+                                    <span class="text-slate-300 font-medium">{{ number_format($site->visitors) }}</span>
+                                </span>
+                                <span class="text-slate-400">
+                                    <span class="text-slate-500">Commissie:</span>
+                                    <span class="text-slate-300 font-medium">€{{ number_format($site->commission, 2, ',', '.') }}</span>
+                                </span>
+                                @if($site->visitors > 100 && $site->commission == 0)
+                                <span class="text-amber-400 font-medium">
+                                    ⚡ Hoog potentieel
+                                </span>
+                                @endif
+                            </div>
+                        </div>
+                        @empty
+                        <p class="text-slate-500 text-center py-8">Geen data</p>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+            @else
+            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-12 text-center border border-slate-700/20">
+                <p class="text-slate-400 text-lg">Geen data beschikbaar voor deze periode</p>
+                <p class="text-slate-500 text-sm mt-2">Run <code class="bg-[#1a1d2e] px-2 py-1 rounded">php artisan metrics:aggregate</code> om data te genereren</p>
+            </div>
+            @endif
+        </div>
+        @endforeach
+
+    </main>
+
+    <script>
+        // Get initial chart metric from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialChartMetric = urlParams.get('chartMetric') || 'commission';
+
+        // Store chart instances
+        const charts = {};
+        const chartData = {
+            @foreach(['7d', '30d', '90d', '365d', 'all-time'] as $periodKey)
+            '{{ $periodKey }}': {
+                dates: @json($dailyMetricsData[$periodKey]->pluck('date') ?? []),
+                commission: @json($dailyMetricsData[$periodKey]->pluck('commission') ?? []),
+                visitors: @json($dailyMetricsData[$periodKey]->pluck('visitors') ?? []),
+                pageviews: @json($dailyMetricsData[$periodKey]->pluck('pageviews') ?? []),
+                clicks: @json($dailyMetricsData[$periodKey]->pluck('clicks') ?? [])
+            },
+            @endforeach
+        };
+
+        // Metric colors
+        const metricColors = {
+            'commission': { border: 'rgb(139, 92, 246)', bg: 'rgba(139, 92, 246, 0.3)', prefix: '€' },
+            'visitors': { border: 'rgb(34, 197, 94)', bg: 'rgba(34, 197, 94, 0.3)', prefix: '' },
+            'pageviews': { border: 'rgb(59, 130, 246)', bg: 'rgba(59, 130, 246, 0.3)', prefix: '' },
+            'clicks': { border: 'rgb(249, 115, 22)', bg: 'rgba(249, 115, 22, 0.3)', prefix: '' }
+        };
+
+        // Initialize charts
+        @foreach(['7d', '30d', '90d', '365d', 'all-time'] as $periodKey)
+        (function() {
+            const periodKey = '{{ $periodKey }}';
+            const ctx = document.getElementById('chart-{{ $periodKey }}');
+            if (!ctx) return;
+
+            const currentColors = metricColors[initialChartMetric];
+            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, currentColors.bg);
+            gradient.addColorStop(1, currentColors.bg.replace('0.3', '0'));
+
+            charts[periodKey] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData['{{ $periodKey }}'].dates,
+                    datasets: [{
+                        label: initialChartMetric.charAt(0).toUpperCase() + initialChartMetric.slice(1),
+                        data: chartData['{{ $periodKey }}'][initialChartMetric],
+                        borderColor: currentColors.border,
+                        backgroundColor: gradient,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: currentColors.border,
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2,
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    aspectRatio: 2.5,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: 'rgb(226, 232, 240)',
+                            bodyColor: 'rgb(148, 163, 184)',
+                            borderColor: currentColors.bg,
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return currentColors.prefix + context.parsed.y.toFixed(initialChartMetric === 'commission' ? 2 : 0);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(100, 116, 139, 0.1)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: 'rgb(148, 163, 184)',
+                                callback: function(value) {
+                                    return currentColors.prefix + value;
+                                },
+                                padding: 4
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: 'rgb(148, 163, 184)',
+                                maxTicksLimit: 8,
+                                padding: 4,
+                                maxRotation: 0
+                            }
+                        }
+                    },
+                    layout: {
+                        padding: {
+                            top: 10,
+                            right: 10,
+                            bottom: 0,
+                            left: 0
+                        }
+                    }
+                }
+            });
+
+            // Update chart function
+            window['updateChart' + periodKey.replace('-', '')] = function(metric) {
+                const chart = charts[periodKey];
+                const colors = {
+                    'commission': { border: 'rgb(139, 92, 246)', bg: 'rgba(139, 92, 246, 0.3)', prefix: '€' },
+                    'visitors': { border: 'rgb(34, 197, 94)', bg: 'rgba(34, 197, 94, 0.3)', prefix: '' },
+                    'pageviews': { border: 'rgb(59, 130, 246)', bg: 'rgba(59, 130, 246, 0.3)', prefix: '' },
+                    'clicks': { border: 'rgb(249, 115, 22)', bg: 'rgba(249, 115, 22, 0.3)', prefix: '' }
+                };
+
+                const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+                gradient.addColorStop(0, colors[metric].bg);
+                gradient.addColorStop(1, colors[metric].bg.replace('0.3', '0'));
+
+                chart.data.datasets[0].data = chartData[periodKey][metric];
+                chart.data.datasets[0].borderColor = colors[metric].border;
+                chart.data.datasets[0].backgroundColor = gradient;
+                chart.data.datasets[0].pointHoverBackgroundColor = colors[metric].border;
+
+                chart.options.scales.y.ticks.callback = function(value) {
+                    return colors[metric].prefix + value;
+                };
+                chart.options.plugins.tooltip.callbacks.label = function(context) {
+                    return colors[metric].prefix + context.parsed.y.toFixed(metric === 'commission' ? 2 : 0);
+                };
+
+                chart.update();
+            };
+        })();
+        @endforeach
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+
+</body>
+</html>
