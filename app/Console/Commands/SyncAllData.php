@@ -33,20 +33,23 @@ class SyncAllData extends Command
 
         // Step 1: Import raw data from APIs
         $this->info('📥 Step 1/4: Importing raw data from APIs...');
-        $this->line('→ Fetching Fathom pageviews...');
-        $this->call('fathom:import-pageviews');
+        $this->line('→ Fetching Fathom pageviews (all sites)...');
+        $this->call('fathom:import-all', ['--days' => 30]);
 
         $this->line('→ Fetching Fathom events (affiliate clicks)...');
-        $this->call('fathom:import-event-data');
+        $this->call('fathom:import-event-data', ['--days' => 30]);
 
         $this->line('→ Fetching Bol.com orders...');
-        $this->call('bol:import-orders');
+        $this->call('bol:import-orders', ['--days' => 30]);
         $this->newLine();
 
         // Step 2: Enrich data with context
         $this->info('🔍 Step 2/4: Enriching data with context...');
         $this->line('→ Enriching pageviews with site/page info...');
         $this->call('fathom:enrich-pageviews');
+
+        $this->line('→ Enriching site totals...');
+        $this->call('fathom:enrich-totals');
 
         $this->line('→ Enriching events with site/page info...');
         $this->call('fathom:enrich-events');
@@ -57,11 +60,18 @@ class SyncAllData extends Command
 
         // Step 3: Aggregate metrics
         $this->info('📊 Step 3/4: Aggregating metrics...');
+
+        $periods = $isQuick
+            ? ['daily', '7d', '30d', '90d']
+            : ['daily', '7d', '30d', '90d', '365d', 'all-time'];
+
+        foreach ($periods as $period) {
+            $this->line("  → Aggregating {$period}...");
+            $this->call('metrics:aggregate', ['--period' => $period]);
+        }
+
         if ($isQuick) {
-            $this->line('⚡ Quick mode: skipping all-time aggregation');
-            $this->call('metrics:aggregate', ['--quick' => true]);
-        } else {
-            $this->call('metrics:aggregate');
+            $this->line('⚡ Quick mode: skipped 365d and all-time');
         }
         $this->newLine();
 
