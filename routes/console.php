@@ -9,20 +9,25 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // ============================================
-// AUTOMATED DATA SYNC - Runs every 15 minutes
+// INCREMENTAL SYNC - Runs every 15 minutes
 // ============================================
-// Quick sync: imports + enriches + aggregates (skip all-time to save time)
-Schedule::command('sync:all --quick')
+// Fetches only NEW data since last sync (efficient)
+Schedule::command('data:sync-incremental')
     ->everyFifteenMinutes()
     ->runInBackground()
     ->onOneServer();
 
 // ============================================
-// FULL SYNC - Once per day at 6 AM
+// DAILY FULL AGGREGATION - Once per day at 6 AM
 // ============================================
-// Full sync including all-time aggregation
-Schedule::command('sync:all')
+// Re-aggregate all-time and 365d metrics (heavy operations)
+Schedule::command('metrics:aggregate --period=365d')
     ->dailyAt('06:00')
+    ->runInBackground()
+    ->onOneServer();
+
+Schedule::command('metrics:aggregate --period=all-time')
+    ->dailyAt('06:15')
     ->runInBackground()
     ->onOneServer();
 
