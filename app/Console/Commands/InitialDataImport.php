@@ -8,11 +8,11 @@ use Illuminate\Support\Facades\DB;
 class InitialDataImport extends Command
 {
     protected $signature = 'data:initial-import {--force : Force re-import and delete existing data}';
-    protected $description = 'Initial historical data import from May 2024 to now (run once during setup)';
+    protected $description = 'Initial historical data import from May 2025 to now (run once during setup)';
 
     public function handle(): int
     {
-        $startDate = '2024-05-01';
+        $startDate = '2025-05-01';
         $endDate = now()->format('Y-m-d');
 
         // Check if data already exists
