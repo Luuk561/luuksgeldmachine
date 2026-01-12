@@ -24,7 +24,8 @@ class IncrementalDataSync extends Command
             return self::FAILURE;
         }
 
-        $daysSinceLastSync = now()->diffInDays($lastSync);
+        $lastSyncCarbon = \Carbon\Carbon::parse($lastSync);
+        $daysSinceLastSync = (int) $lastSyncCarbon->diffInDays(now());
 
         // If more than 2 days, something is wrong - limit to prevent massive imports
         if ($daysSinceLastSync > 2) {
