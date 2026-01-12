@@ -69,37 +69,23 @@ class IncrementalDataSync extends Command
             $this->newLine();
         }
 
-        // Step 1: Import raw data (only recent days)
-        $this->info('📥 Step 1/3: Importing recent data from APIs...');
+        // Step 1: Import Bol orders only (FAST!)
+        // Fathom syncs hourly via separate command (data:sync-fathom) to avoid 25-min delays
+        $this->info('📥 Step 1/2: Importing Bol orders (fast ~10 sec)...');
 
-        $this->line("   → Fathom pageviews ({$daysToFetch}d)...");
-        $this->call('fathom:import-all', ['--days' => $daysToFetch]);
-
-        $this->line("   → Fathom events ({$daysToFetch}d)...");
-        $this->call('fathom:import-event-data', ['--days' => $daysToFetch]);
-
-        $this->line("   → Bol orders ({$daysToFetch}d)...");
-        $this->call('bol:import-orders', ['--days' => $daysToFetch]);
+        $this->line("   → Bol orders (last 2 days)...");
+        $this->call('bol:import-orders', ['--days' => 2]);
         $this->newLine();
 
-        // Step 2: Enrich (only processes new/updated data)
-        $this->info('🔍 Step 2/3: Enriching new data...');
-
-        $this->line('   → Enriching pageviews...');
-        $this->call('fathom:enrich-pageviews');
-
-        $this->line('   → Enriching site totals...');
-        $this->call('fathom:enrich-totals');
-
-        $this->line('   → Enriching events...');
-        $this->call('fathom:enrich-events');
+        // Step 2: Enrich orders
+        $this->info('🔍 Step 2/2: Enriching orders...');
 
         $this->line('   → Enriching orders...');
         $this->call('bol:enrich-orders');
         $this->newLine();
 
-        // Step 3: Re-aggregate (only recent periods need updating)
-        $this->info('📊 Step 3/3: Updating aggregated metrics...');
+        // Step 3: Re-aggregate metrics
+        $this->info('📊 Re-aggregating metrics...');
 
         // Only update rolling periods (daily, 7d, 30d, 90d)
         // Skip all-time and 365d for speed (those run once per day)

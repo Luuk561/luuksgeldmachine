@@ -9,11 +9,21 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // ============================================
-// INCREMENTAL SYNC - Runs every 15 minutes
+// QUICK SYNC - Every 15 minutes (Bol orders only)
 // ============================================
-// Fetches only NEW data since last sync (efficient)
+// Fast: updates commission/orders data only (~10 seconds)
 Schedule::command('data:sync-incremental')
     ->everyFifteenMinutes()
+    ->runInBackground()
+    ->onOneServer();
+
+// ============================================
+// FATHOM SYNC - Every hour (pageviews & clicks)
+// ============================================
+// Slow: Fathom API rate limits (~25 min for all sites)
+// Runs hourly to provide near-realtime traffic data
+Schedule::command('data:sync-fathom')
+    ->hourly()
     ->runInBackground()
     ->onOneServer();
 
