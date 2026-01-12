@@ -7,6 +7,25 @@ use Illuminate\Support\Facades\DB;
 
 class ManualCommissionController extends Controller
 {
+    public function index()
+    {
+        $commissions = DB::table('manual_commissions')
+            ->leftJoin('sites', 'manual_commissions.site_id', '=', 'sites.id')
+            ->select(
+                'manual_commissions.*',
+                'sites.name as site_name',
+                'sites.domain as site_domain'
+            )
+            ->orderBy('manual_commissions.date', 'desc')
+            ->get();
+
+        $sites = DB::table('sites')
+            ->orderBy('name')
+            ->get();
+
+        return view('manual-commission.index', compact('commissions', 'sites'));
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -29,9 +48,13 @@ class ManualCommissionController extends Controller
             'updated_at' => now(),
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Manual commission added successfully'
-        ]);
+        return redirect()->back()->with('success', 'Manual commission added successfully');
+    }
+
+    public function destroy($id)
+    {
+        DB::table('manual_commissions')->where('id', $id)->delete();
+
+        return redirect()->back()->with('success', 'Manual commission deleted successfully');
     }
 }

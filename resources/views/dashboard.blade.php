@@ -16,6 +16,7 @@
     <main class="ml-20 p-10" x-data="{
         period: new URLSearchParams(window.location.search).get('period') || '30d',
         chartMetric: new URLSearchParams(window.location.search).get('chartMetric') || 'commission',
+        showManualModal: false,
         statuses: (() => {
             const params = new URLSearchParams(window.location.search);
             const statusParams = params.getAll('statuses[]');
@@ -105,7 +106,16 @@
                 <div class="flex flex-col gap-4">
                     <!-- Commission Card -->
                     <div class="bg-gradient-to-br from-[#2d3048] to-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20 flex-1">
-                        <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">COMMISSIE</p>
+                        <div class="flex items-start justify-between mb-2">
+                            <p class="text-xs uppercase tracking-wider text-slate-400">COMMISSIE</p>
+                            <button @click="showManualModal = true"
+                                    class="text-lavender hover:text-lavender/80 transition-colors"
+                                    title="Handmatige commissie toevoegen">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                            </button>
+                        </div>
                         <p class="text-5xl font-light text-white mb-4">€{{ number_format($metrics->commission, 2, '.', '') }}</p>
 
                         <!-- Order Status Checkboxes -->
@@ -446,6 +456,99 @@
         })();
         @endforeach
     </script>
+
+    <!-- Manual Commission Modal -->
+    <div x-show="showManualModal"
+         x-cloak
+         @click.self="showManualModal = false"
+         class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+         x-transition>
+        <div @click.stop
+             class="bg-[#252839] rounded-xl p-8 max-w-md w-full shadow-2xl border border-slate-700/30"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100">
+
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-light text-slate-100">Handmatige Commissie</h2>
+                <button @click="showManualModal = false"
+                        class="text-slate-400 hover:text-slate-200 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{{ route('manual-commission.store') }}" class="space-y-4">
+                @csrf
+
+                <div>
+                    <label class="block text-sm text-slate-400 mb-2">Site</label>
+                    <select name="site_id" required
+                            class="w-full bg-[#1a1d2e] border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-lavender focus:ring-2 focus:ring-lavender/30 transition-colors">
+                        <option value="">Selecteer een site...</option>
+                        @foreach($sites as $site)
+                            <option value="{{ $site->id }}">{{ $site->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-2">Commissie (€)</label>
+                        <input type="number" step="0.01" name="commission" required
+                               class="w-full bg-[#1a1d2e] border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-lavender focus:ring-2 focus:ring-lavender/30 transition-colors"
+                               placeholder="0.00">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-2">Datum</label>
+                        <input type="date" name="date" required
+                               value="{{ date('Y-m-d') }}"
+                               class="w-full bg-[#1a1d2e] border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-lavender focus:ring-2 focus:ring-lavender/30 transition-colors">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-2">Platform</label>
+                        <input type="text" name="platform" required
+                               class="w-full bg-[#1a1d2e] border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-lavender focus:ring-2 focus:ring-lavender/30 transition-colors"
+                               placeholder="bijv. Amazon">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-2">Status</label>
+                        <select name="status" required
+                                class="w-full bg-[#1a1d2e] border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-lavender focus:ring-2 focus:ring-lavender/30 transition-colors">
+                            <option value="Geaccepteerd">Geaccepteerd</option>
+                            <option value="Open" selected>Open</option>
+                            <option value="Geweigerd">Geweigerd</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm text-slate-400 mb-2">Notitie (optioneel)</label>
+                    <textarea name="note" rows="3"
+                              class="w-full bg-[#1a1d2e] border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-lavender focus:ring-2 focus:ring-lavender/30 transition-colors resize-none"
+                              placeholder="Eventuele extra informatie..."></textarea>
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button"
+                            @click="showManualModal = false"
+                            class="flex-1 bg-[#1a1d2e] hover:bg-[#252839] text-slate-300 py-2.5 rounded-lg transition-colors text-sm font-medium">
+                        Annuleren
+                    </button>
+                    <button type="submit"
+                            class="flex-1 bg-lavender hover:bg-lavender/90 text-white py-2.5 rounded-lg transition-all duration-200 text-sm font-medium shadow-lg shadow-lavender/30">
+                        Toevoegen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <style>
         [x-cloak] { display: none !important; }
