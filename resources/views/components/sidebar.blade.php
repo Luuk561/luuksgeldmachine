@@ -1,21 +1,30 @@
-<!-- Mobile Menu Toggle (alleen zichtbaar op mobiel) -->
-<div class="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#1a1d2e]/95 backdrop-blur-md z-50 flex items-center justify-between px-4 border-b border-slate-700/30">
-    <h1 class="text-lg font-light text-slate-100">luuksgeldmachine</h1>
-    <button @click="mobileMenuOpen = !mobileMenuOpen" class="w-10 h-10 rounded-lg bg-lavender/15 flex items-center justify-center hover:bg-lavender/25 transition-colors">
-        <svg class="w-6 h-6 text-lavender" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-        </svg>
-    </button>
-</div>
-
-<!-- Sidebar: Desktop (altijd zichtbaar) + Mobile (slideable) -->
-<aside
-    x-data="{ mobileMenuOpen: false }"
-    :class="mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
-    class="fixed left-0 top-0 h-full w-20 bg-base-900/95 backdrop-blur-light z-40 flex flex-col transition-transform duration-300 ease-in-out lg:z-50">
+<!-- Mobile Navigation Wrapper -->
+<div x-data="{ mobileMenuOpen: false }">
+    <!-- Mobile Menu Toggle (alleen zichtbaar op mobiel) -->
+    <div class="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#1a1d2e]/95 backdrop-blur-md z-50 flex items-center justify-between px-4 border-b border-slate-700/30">
+        <h1 class="text-lg font-light text-slate-100">luuksgeldmachine</h1>
+        <button @click="mobileMenuOpen = !mobileMenuOpen" class="w-10 h-10 rounded-lg bg-lavender/15 flex items-center justify-center hover:bg-lavender/25 transition-colors">
+            <svg class="w-6 h-6 text-lavender" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+        </button>
+    </div>
 
     <!-- Overlay voor mobiel (sluit menu bij klik) -->
-    <div x-show="mobileMenuOpen" @click="mobileMenuOpen = false" class="lg:hidden fixed inset-0 bg-black/50 -z-10"></div>
+    <div x-show="mobileMenuOpen"
+         @click="mobileMenuOpen = false"
+         x-transition:enter="transition-opacity ease-linear duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity ease-linear duration-300"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="lg:hidden fixed inset-0 bg-black/50 z-30"></div>
+
+    <!-- Sidebar: Desktop (altijd zichtbaar) + Mobile (slideable) -->
+    <aside
+        :class="mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+        class="fixed left-0 top-0 h-full w-20 bg-base-900/95 backdrop-blur-light z-40 flex flex-col transition-transform duration-300 ease-in-out lg:z-50">
 
     <div class="flex-1 flex flex-col items-center py-8 space-y-6 mt-16 lg:mt-0">
 
@@ -111,3 +120,4 @@
 
     </div>
 </aside>
+</div>
