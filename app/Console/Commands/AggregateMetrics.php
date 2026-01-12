@@ -45,17 +45,19 @@ class AggregateMetrics extends Command
 
     private function aggregateDaily(): void
     {
-        // Get all unique dates from ALL data sources (orders, pageviews, site totals, clicks)
+        // Get all unique dates from ALL data sources (orders, pageviews, site totals, clicks, manual commissions)
         $orderDates = DB::table('enriched_orders')->selectRaw('DISTINCT order_date as date')->pluck('date');
         $pageviewDates = DB::table('enriched_pageviews')->selectRaw('DISTINCT date')->pluck('date');
         $siteTotalDates = DB::table('enriched_site_totals')->selectRaw('DISTINCT date')->pluck('date');
         $clickDates = DB::table('enriched_click_aggregates')->selectRaw('DISTINCT date')->pluck('date');
+        $manualCommissionDates = DB::table('manual_commissions')->selectRaw('DISTINCT date')->pluck('date');
 
         // Merge and get unique dates
         $dates = $orderDates
             ->merge($pageviewDates)
             ->merge($siteTotalDates)
             ->merge($clickDates)
+            ->merge($manualCommissionDates)
             ->unique()
             ->sort()
             ->values();
@@ -567,16 +569,18 @@ class AggregateMetrics extends Command
 
     private function aggregateAllTime(): void
     {
-        // Get earliest and latest dates from all data sources
+        // Get earliest and latest dates from all data sources (including manual commissions)
         $orderDates = DB::table('enriched_orders')->selectRaw('DISTINCT order_date as date')->pluck('date');
         $pageviewDates = DB::table('enriched_pageviews')->selectRaw('DISTINCT date')->pluck('date');
         $siteTotalDates = DB::table('enriched_site_totals')->selectRaw('DISTINCT date')->pluck('date');
         $clickDates = DB::table('enriched_click_aggregates')->selectRaw('DISTINCT date')->pluck('date');
+        $manualCommissionDates = DB::table('manual_commissions')->selectRaw('DISTINCT date')->pluck('date');
 
         $allDates = $orderDates
             ->merge($pageviewDates)
             ->merge($siteTotalDates)
             ->merge($clickDates)
+            ->merge($manualCommissionDates)
             ->unique()
             ->sort()
             ->values();

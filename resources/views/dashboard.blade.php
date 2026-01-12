@@ -56,7 +56,7 @@
         <!-- Header with Period Selector on Right -->
         <div class="flex items-start justify-between mb-8">
             <div>
-                <h1 class="text-4xl font-light text-slate-100 mb-2">Dashboard</h1>
+                <h1 class="text-4xl font-light text-slate-100 mb-2">luuksgeldmachine</h1>
                 <p class="text-slate-400">Waar moet je nu op focussen om meer te verdienen?</p>
             </div>
 
