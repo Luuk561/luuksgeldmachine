@@ -12,8 +12,8 @@
 
     <x-sidebar />
 
-    <!-- Main Canvas -->
-    <main class="ml-20 p-10" x-data="{
+    <!-- Main Canvas: Responsive padding en margin -->
+    <main class="lg:ml-20 ml-0 p-4 sm:p-6 lg:p-10 pt-20 lg:pt-10" x-data="{
         period: new URLSearchParams(window.location.search).get('period') || '30d',
         chartMetric: new URLSearchParams(window.location.search).get('chartMetric') || 'commission',
         showManualModal: false,
@@ -53,11 +53,11 @@
         }
     }">
 
-        <!-- Header with Period Selector on Right -->
-        <div class="flex items-start justify-between mb-8">
-            <div>
-                <h1 class="text-4xl font-light text-slate-100 mb-2">luuksgeldmachine</h1>
-                <p class="text-slate-400">Waar moet je nu op focussen om meer te verdienen?</p>
+        <!-- Header with Period Selector on Right (mobile: stacked) -->
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6 sm:mb-8">
+            <div class="hidden lg:block">
+                <h1 class="text-3xl sm:text-4xl font-light text-slate-100 mb-2">luuksgeldmachine</h1>
+                <p class="text-sm sm:text-base text-slate-400">Waar moet je nu op focussen om meer te verdienen?</p>
 
                 <!-- Data Freshness Indicator -->
                 @if($dataFreshness['last_sync'])
@@ -91,13 +91,13 @@
                 @endif
             </div>
 
-            <!-- Period Selector - Right Top -->
-            <div class="flex gap-2">
+            <!-- Period Selector - Desktop: Right Top, Mobile: Horizontal scroll -->
+            <div class="flex gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide">
                 <template x-for="(periodData, periodKey) in periods" :key="periodKey">
                     <button
                         @click="changePeriod(periodKey)"
                         :class="period === periodKey ? 'bg-lavender text-white shadow-lg shadow-lavender/30' : 'bg-[#252839] text-slate-400 hover:bg-[#2d3048]'"
-                        class="px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium"
+                        class="px-3 sm:px-4 py-2 rounded-lg transition-all duration-200 text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0"
                         x-text="periodData.label"
                     ></button>
                 </template>
@@ -117,26 +117,26 @@
 
                 <!-- LEFT: Chart - Takes 2 columns -->
                 <div class="lg:col-span-2 bg-[#252839] backdrop-blur-light rounded-xl shadow-lg border border-slate-700/20 flex flex-col">
-                    <!-- Chart Metric Switcher -->
-                    <div class="flex gap-2 p-6 pb-4">
+                    <!-- Chart Metric Switcher: Horizontal scroll on mobile -->
+                    <div class="flex gap-2 p-4 sm:p-6 pb-3 sm:pb-4 overflow-x-auto scrollbar-hide">
                         <template x-for="(metricData, metricKey) in metrics" :key="metricKey">
                             <button
                                 @click="chartMetric = metricKey; window['updateChart{{ str_replace('-', '', $periodKey) }}'](metricKey)"
                                 :class="chartMetric === metricKey ? 'bg-lavender text-white shadow-md' : 'bg-[#1a1d2e] text-slate-400 hover:bg-[#2d3048]'"
-                                class="px-3 py-1.5 rounded-lg transition-all duration-200 text-xs font-medium"
+                                class="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-all duration-200 text-xs font-medium whitespace-nowrap flex-shrink-0"
                                 x-text="metricData.label"
                             ></button>
                         </template>
                     </div>
-                    <div class="flex-1 px-6 pb-6">
+                    <div class="flex-1 px-4 sm:px-6 pb-4 sm:pb-6">
                         <canvas id="chart-{{ $periodKey }}"></canvas>
                     </div>
                 </div>
 
                 <!-- RIGHT: Metrics - Takes 1 column -->
                 <div class="flex flex-col gap-4">
-                    <!-- Commission Card -->
-                    <div class="bg-gradient-to-br from-[#2d3048] to-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20 flex-1">
+                    <!-- Commission Card: Responsive padding and font sizes -->
+                    <div class="bg-gradient-to-br from-[#2d3048] to-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20 flex-1">
                         <div class="flex items-start justify-between mb-2">
                             <p class="text-xs uppercase tracking-wider text-slate-400">COMMISSIE</p>
                             <button @click="showManualModal = true"
@@ -147,7 +147,7 @@
                                 </svg>
                             </button>
                         </div>
-                        <p class="text-5xl font-light text-white mb-4">€{{ number_format($metrics->commission, 2, '.', '') }}</p>
+                        <p class="text-4xl sm:text-5xl font-light text-white mb-4">€{{ number_format($metrics->commission, 2, '.', '') }}</p>
 
                         <!-- Order Status Checkboxes -->
                         <div class="mb-4">
@@ -183,15 +183,15 @@
                         </button>
                     </div>
 
-                    <!-- Orders & Visitors Row -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 shadow-lg border border-slate-700/20">
+                    <!-- Orders & Visitors Row: Responsive padding -->
+                    <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-3 sm:p-4 shadow-lg border border-slate-700/20">
                             <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Orders</p>
-                            <p class="text-3xl font-light text-white">{{ number_format($metrics->orders) }}</p>
+                            <p class="text-2xl sm:text-3xl font-light text-white">{{ number_format($metrics->orders) }}</p>
                         </div>
-                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 shadow-lg border border-slate-700/20">
+                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-3 sm:p-4 shadow-lg border border-slate-700/20">
                             <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Visitors</p>
-                            <p class="text-3xl font-light text-white">{{ number_format($metrics->visitors) }}</p>
+                            <p class="text-2xl sm:text-3xl font-light text-white">{{ number_format($metrics->visitors) }}</p>
                         </div>
                     </div>
 
@@ -207,46 +207,46 @@
                         };
                         $avgPerDay = $days > 0 ? $metrics->commission / $days : 0;
                     @endphp
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 shadow-lg border border-slate-700/20">
+                    <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-3 sm:p-4 shadow-lg border border-slate-700/20">
                             <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">RPV</p>
-                            <p class="text-3xl font-light text-white">€{{ number_format($metrics->rpv, 3, '.', '') }}</p>
+                            <p class="text-2xl sm:text-3xl font-light text-white">€{{ number_format($metrics->rpv, 3, '.', '') }}</p>
                         </div>
-                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 shadow-lg border border-slate-700/20">
+                        <div class="bg-[#252839] backdrop-blur-light rounded-xl p-3 sm:p-4 shadow-lg border border-slate-700/20">
                             <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Gem. per Dag</p>
-                            <p class="text-3xl font-light text-white">€{{ number_format($avgPerDay, 2, '.', '') }}</p>
+                            <p class="text-2xl sm:text-3xl font-light text-white">€{{ number_format($avgPerDay, 2, '.', '') }}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Additional Metrics Row -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
+            <!-- Additional Metrics Row: Mobile 2 cols, Desktop 4 cols -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
                     <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Pageviews</p>
-                    <p class="text-3xl font-light text-white">{{ number_format($metrics->pageviews) }}</p>
+                    <p class="text-2xl sm:text-3xl font-light text-white">{{ number_format($metrics->pageviews) }}</p>
                 </div>
-                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
-                    <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Affiliate Clicks</p>
-                    <p class="text-3xl font-light text-white">{{ number_format($metrics->clicks) }}</p>
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
+                    <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Aff. Clicks</p>
+                    <p class="text-2xl sm:text-3xl font-light text-white">{{ number_format($metrics->clicks) }}</p>
                 </div>
-                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
                     <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">CTR</p>
-                    <p class="text-3xl font-light text-white">{{ $metrics->pageviews > 0 ? number_format(($metrics->clicks / $metrics->pageviews) * 100, 1) : 0 }}%</p>
+                    <p class="text-2xl sm:text-3xl font-light text-white">{{ $metrics->pageviews > 0 ? number_format(($metrics->clicks / $metrics->pageviews) * 100, 1) : 0 }}%</p>
                 </div>
-                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
                     <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Conversie</p>
-                    <p class="text-3xl font-light text-white">{{ number_format($metrics->conversion_rate, 1) }}%</p>
+                    <p class="text-2xl sm:text-3xl font-light text-white">{{ number_format($metrics->conversion_rate, 1) }}%</p>
                 </div>
             </div>
 
             <!-- Bottom: Top Performers & Worst Sites -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Top Performers -->
-                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
-                    <div class="flex items-center gap-3 mb-6">
+                <!-- Top Performers: Responsive padding -->
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
+                    <div class="flex items-center gap-3 mb-4 sm:mb-6">
                         <div class="w-1 h-6 bg-emerald-500 rounded-full"></div>
-                        <h2 class="text-xl font-light text-slate-100">Top Performers</h2>
+                        <h2 class="text-lg sm:text-xl font-light text-slate-100">Top Performers</h2>
                     </div>
                     <div class="space-y-2">
                         @forelse($topSitesData[$periodKey] ?? [] as $index => $site)
@@ -282,11 +282,11 @@
                     </div>
                 </div>
 
-                <!-- Lowest RPV (Optimization Opportunities) -->
-                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
-                    <div class="flex items-center gap-3 mb-6">
+                <!-- Lowest RPV (Optimization Opportunities): Responsive -->
+                <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
+                    <div class="flex items-center gap-3 mb-4 sm:mb-6">
                         <div class="w-1 h-6 bg-amber-500 rounded-full"></div>
-                        <h2 class="text-xl font-light text-slate-100">Optimization Opportunities</h2>
+                        <h2 class="text-lg sm:text-xl font-light text-slate-100">Optimization Opportunities</h2>
                     </div>
                     <div class="space-y-2">
                         @forelse($worstSitesData[$periodKey] ?? [] as $index => $site)
@@ -583,6 +583,15 @@
 
     <style>
         [x-cloak] { display: none !important; }
+
+        /* Hide scrollbar maar behoud functionality */
+        .scrollbar-hide {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;  /* Chrome, Safari and Opera */
+        }
     </style>
 
 </body>

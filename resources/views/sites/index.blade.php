@@ -11,8 +11,8 @@
 
     <x-sidebar />
 
-    <!-- Main Canvas -->
-    <main class="ml-20 p-10" x-data="{
+    <!-- Main Canvas: Responsive -->
+    <main class="lg:ml-20 ml-0 p-4 sm:p-6 lg:p-10 pt-20 lg:pt-10" x-data="{
         period: '{{ $period }}',
         statusFilter: '{{ $statusFilter }}',
         periods: {
@@ -31,53 +31,53 @@
         }
     }">
 
-        <!-- Header with Period Selector -->
-        <div class="mb-8 flex items-center justify-between">
-            <div>
-                <h1 class="text-4xl font-light text-slate-100 mb-2">Sites</h1>
-                <p class="text-slate-400">Overview van alle {{ count($sites) }} affiliate sites</p>
+        <!-- Header with Period Selector: Responsive -->
+        <div class="mb-6 sm:mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div class="hidden lg:block">
+                <h1 class="text-3xl sm:text-4xl font-light text-slate-100 mb-2">Sites</h1>
+                <p class="text-sm sm:text-base text-slate-400">Overview van alle {{ count($sites) }} affiliate sites</p>
             </div>
 
-            <!-- Period Selector - Top Right -->
-            <div class="flex gap-2">
+            <!-- Period Selector: Horizontal scroll on mobile -->
+            <div class="flex gap-2 overflow-x-auto scrollbar-hide pb-2 lg:pb-0">
                 <template x-for="(periodData, periodKey) in periods" :key="periodKey">
                     <button
                         @click="changePeriod(periodKey)"
                         :class="period === periodKey ? 'bg-lavender text-white' : 'bg-[#252839] text-slate-400 hover:bg-[#2d3048]'"
-                        class="px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium"
+                        class="px-3 sm:px-4 py-2 rounded-lg transition-all duration-200 text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0"
                         x-text="periodData.label"
                     ></button>
                 </template>
             </div>
         </div>
 
-        <!-- Summary Cards -->
-        <div class="grid grid-cols-5 gap-4 mb-8">
-            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Total Commission</p>
-                <p class="text-3xl font-light text-white">€{{ number_format($totals['commission'], 2) }}</p>
+        <!-- Summary Cards: Mobile 2 cols, Tablet 3 cols, Desktop 5 cols -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
+            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Commission</p>
+                <p class="text-2xl sm:text-3xl font-light text-white">€{{ number_format($totals['commission'], 2) }}</p>
             </div>
-            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Total Orders</p>
-                <p class="text-3xl font-light text-white">{{ number_format($totals['orders']) }}</p>
+            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Orders</p>
+                <p class="text-2xl sm:text-3xl font-light text-white">{{ number_format($totals['orders']) }}</p>
             </div>
-            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Total Clicks</p>
-                <p class="text-3xl font-light text-white">{{ number_format($totals['clicks']) }}</p>
+            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Clicks</p>
+                <p class="text-2xl sm:text-3xl font-light text-white">{{ number_format($totals['clicks']) }}</p>
             </div>
-            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Total Visitors</p>
-                <p class="text-3xl font-light text-white">{{ number_format($totals['visitors']) }}</p>
+            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Visitors</p>
+                <p class="text-2xl sm:text-3xl font-light text-white">{{ number_format($totals['visitors']) }}</p>
             </div>
-            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-6 shadow-lg border border-slate-700/20">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Total Pageviews</p>
-                <p class="text-3xl font-light text-white">{{ number_format($totals['pageviews']) }}</p>
+            <div class="bg-[#252839] backdrop-blur-light rounded-xl p-4 sm:p-6 shadow-lg border border-slate-700/20">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Pageviews</p>
+                <p class="text-2xl sm:text-3xl font-light text-white">{{ number_format($totals['pageviews']) }}</p>
             </div>
         </div>
 
-        <!-- Sites Table -->
-        <div class="bg-[#252839] backdrop-blur-light rounded-xl shadow-lg border border-slate-700/20 overflow-hidden">
-            <table class="w-full">
+        <!-- Sites Table: Horizontal scroll on mobile -->
+        <div class="bg-[#252839] backdrop-blur-light rounded-xl shadow-lg border border-slate-700/20 overflow-x-auto">
+            <table class="w-full min-w-[800px]">
                 <thead>
                     <tr class="border-b border-slate-700/30">
                         <th class="text-left p-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Site</th>
@@ -123,6 +123,17 @@
         </div>
 
     </main>
+
+    <style>
+        /* Hide scrollbar maar behoud functionality */
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
 
 </body>
 </html>
