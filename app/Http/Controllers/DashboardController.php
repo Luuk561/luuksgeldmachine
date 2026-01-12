@@ -26,7 +26,7 @@ class DashboardController extends Controller
                 ->first();
 
             // Get daily metrics for chart - fill missing days with zeros
-            $endDate = now();
+            $endDate = today(); // Use today() instead of now() for date-only comparison
 
             // For all-time, get the earliest date from any data source
             if ($periodKey === 'all-time') {
@@ -68,20 +68,27 @@ class DashboardController extends Controller
                     if ($metrics) {
                         $completeData->push($metrics);
                     } else {
-                        // Create empty metrics for this date
-                        $completeData->push((object)[
-                            'date' => $dateStr,
-                            'period_type' => 'daily',
-                            'status_filter' => $statusFilter,
-                            'commission' => 0,
-                            'orders' => 0,
-                            'clicks' => 0,
-                            'pageviews' => 0,
-                            'visitors' => 0,
-                            'visits' => 0,
-                            'rpv' => 0,
-                            'conversion_rate' => 0,
-                        ]);
+                        // Check if this is TODAY and might have real-time data
+                        if ($dateStr === today()->format('Y-m-d')) {
+                            // Calculate today's metrics from enriched data (real-time fallback)
+                            $todayMetrics = $this->calculateTodayMetrics($statusFilter);
+                            $completeData->push($todayMetrics);
+                        } else {
+                            // Create empty metrics for past dates
+                            $completeData->push((object)[
+                                'date' => $dateStr,
+                                'period_type' => 'daily',
+                                'status_filter' => $statusFilter,
+                                'commission' => 0,
+                                'orders' => 0,
+                                'clicks' => 0,
+                                'pageviews' => 0,
+                                'visitors' => 0,
+                                'visits' => 0,
+                                'rpv' => 0,
+                                'conversion_rate' => 0,
+                            ]);
+                        }
                     }
                 }
 
@@ -145,6 +152,58 @@ class DashboardController extends Controller
         ];
 
         return view('dashboard', compact('metricsData', 'dailyMetricsData', 'topSitesData', 'worstSitesData', 'sites', 'dataFreshness'));
+    }
+
+    private function calculateTodayMetrics(string $statusFilter): object
+    {
+        // Real-time calculation from enriched data for today
+        $today = today()->format('Y-m-d');
+
+        // Get commission from enriched orders
+        $orderMetrics = DB::table('enriched_orders')
+            ->where('order_date', $today)
+            ->when($statusFilter === 'approved', fn($q) => $q->where('status', 'Geaccepteerd'))
+            ->when($statusFilter === 'rejected', fn($q) => $q->where('status', 'Geweigerd'))
+            ->when($statusFilter === 'approved_pending', fn($q) => $q->whereIn('status', ['Geaccepteerd', 'Open']))
+            ->selectRaw('
+                COALESCE(SUM(commission), 0) as commission,
+                COUNT(*) as orders
+            ')
+            ->first();
+
+        // Get traffic from enriched site totals
+        $trafficMetrics = DB::table('enriched_site_totals')
+            ->where('date', $today)
+            ->selectRaw('
+                COALESCE(SUM(visitors), 0) as visitors,
+                COALESCE(SUM(pageviews), 0) as pageviews,
+                COALESCE(SUM(visits), 0) as visits
+            ')
+            ->first();
+
+        // Get clicks from enriched click aggregates
+        $clicks = DB::table('enriched_click_aggregates')
+            ->where('date', $today)
+            ->sum('total_clicks') ?? 0;
+
+        // Calculate derived metrics
+        $visitors = $trafficMetrics->visitors ?? 0;
+        $rpv = $visitors > 0 ? ($orderMetrics->commission / $visitors) : 0;
+        $conversionRate = $clicks > 0 ? (($orderMetrics->orders / $clicks) * 100) : 0;
+
+        return (object)[
+            'date' => $today,
+            'period_type' => 'daily',
+            'status_filter' => $statusFilter,
+            'commission' => $orderMetrics->commission ?? 0,
+            'orders' => $orderMetrics->orders ?? 0,
+            'clicks' => $clicks,
+            'pageviews' => $trafficMetrics->pageviews ?? 0,
+            'visitors' => $visitors,
+            'visits' => $trafficMetrics->visits ?? 0,
+            'rpv' => $rpv,
+            'conversion_rate' => $conversionRate,
+        ];
     }
 
     private function getStatusFilterKey(Request $request): string
