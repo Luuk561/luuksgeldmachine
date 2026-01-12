@@ -80,7 +80,10 @@ class InitialDataImport extends Command
         $this->line("   → Fetching Fathom pageviews (all sites)...");
         $this->call('fathom:import-all', ['--days' => $days]);
 
-        $this->line("   → Fetching Fathom events (affiliate clicks)...");
+        $this->line("   → Setting up Fathom events (one-time)...");
+        $this->call('fathom:import-events');
+
+        $this->line("   → Fetching Fathom event data (affiliate clicks)...");
         $this->call('fathom:import-event-data', ['--days' => $days]);
 
         $this->line("   → Fetching Bol.com orders...");

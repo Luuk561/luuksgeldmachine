@@ -58,6 +58,37 @@
             <div>
                 <h1 class="text-4xl font-light text-slate-100 mb-2">luuksgeldmachine</h1>
                 <p class="text-slate-400">Waar moet je nu op focussen om meer te verdienen?</p>
+
+                <!-- Data Freshness Indicator -->
+                @if($dataFreshness['last_sync'])
+                    <div class="mt-2 flex items-center gap-2 text-xs">
+                        @php
+                            $minutesAgo = $dataFreshness['minutes_ago'];
+                            $status = $dataFreshness['last_log']->status ?? 'unknown';
+
+                            if ($status === 'success' && $minutesAgo <= 20) {
+                                $color = 'text-green-400';
+                                $icon = '●';
+                                $text = "Gesynchroniseerd {$minutesAgo} min geleden";
+                            } elseif ($status === 'success' && $minutesAgo <= 60) {
+                                $color = 'text-yellow-400';
+                                $icon = '●';
+                                $text = "Gesynchroniseerd {$minutesAgo} min geleden";
+                            } else {
+                                $color = 'text-red-400';
+                                $icon = '●';
+                                $text = $status === 'failed' ? 'Laatste sync gefaald' : "Niet gesynchroniseerd ({$minutesAgo} min)";
+                            }
+                        @endphp
+                        <span class="{{ $color }}">{{ $icon }}</span>
+                        <span class="text-slate-500">{{ $text }}</span>
+                    </div>
+                @else
+                    <div class="mt-2 flex items-center gap-2 text-xs">
+                        <span class="text-red-400">●</span>
+                        <span class="text-slate-500">Nog niet gesynchroniseerd</span>
+                    </div>
+                @endif
             </div>
 
             <!-- Period Selector - Right Top -->

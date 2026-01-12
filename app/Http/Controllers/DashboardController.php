@@ -127,7 +127,24 @@ class DashboardController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return view('dashboard', compact('metricsData', 'dailyMetricsData', 'topSitesData', 'worstSitesData', 'sites'));
+        // Get data freshness info
+        $lastSync = DB::table('sync_metadata')
+            ->where('key', 'last_incremental_sync')
+            ->value('value');
+
+        $lastSyncLog = DB::table('sync_logs')
+            ->whereIn('status', ['success', 'failed'])
+            ->orderBy('completed_at', 'desc')
+            ->first();
+
+        $dataFreshness = [
+            'last_sync' => $lastSync,
+            'last_sync_carbon' => $lastSync ? \Carbon\Carbon::parse($lastSync) : null,
+            'minutes_ago' => $lastSync ? now()->diffInMinutes(\Carbon\Carbon::parse($lastSync)) : null,
+            'last_log' => $lastSyncLog,
+        ];
+
+        return view('dashboard', compact('metricsData', 'dailyMetricsData', 'topSitesData', 'worstSitesData', 'sites', 'dataFreshness'));
     }
 
     private function getStatusFilterKey(Request $request): string

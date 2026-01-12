@@ -14,15 +14,34 @@ class IncrementalDataSync extends Command
     {
         $startTime = now();
 
-        // Get last sync timestamp
-        $lastSync = DB::table('sync_metadata')
-            ->where('key', 'last_incremental_sync')
-            ->value('value');
+        // Create sync log entry
+        $logId = DB::table('sync_logs')->insertGetId([
+            'sync_type' => 'incremental',
+            'started_at' => $startTime,
+            'status' => 'running',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
-        if (!$lastSync) {
-            $this->warn('⚠️  No previous sync found. Run data:initial-import first!');
-            return self::FAILURE;
-        }
+        try {
+            // Get last sync timestamp
+            $lastSync = DB::table('sync_metadata')
+                ->where('key', 'last_incremental_sync')
+                ->value('value');
+
+            if (!$lastSync) {
+                $this->warn('⚠️  No previous sync found. Run data:initial-import first!');
+
+                DB::table('sync_logs')->where('id', $logId)->update([
+                    'status' => 'failed',
+                    'completed_at' => now(),
+                    'duration_seconds' => now()->diffInSeconds($startTime),
+                    'error_message' => 'No previous sync found in sync_metadata',
+                    'updated_at' => now(),
+                ]);
+
+                return self::FAILURE;
+            }
 
         $lastSyncCarbon = \Carbon\Carbon::parse($lastSync);
         $daysSinceLastSync = (int) $lastSyncCarbon->diffInDays(now());
@@ -41,6 +60,14 @@ class IncrementalDataSync extends Command
         $this->info("   Last sync: {$lastSync}");
         $this->info("   Fetching: {$daysToFetch} day(s) of new data");
         $this->newLine();
+
+        // Check if events are set up (one-time setup needed)
+        $eventCount = DB::table('fathom_events')->where('is_affiliate_click', true)->count();
+        if ($eventCount === 0) {
+            $this->warn("⚠️  No affiliate click events found. Setting up events first...");
+            $this->call('fathom:import-events');
+            $this->newLine();
+        }
 
         // Step 1: Import raw data (only recent days)
         $this->info('📥 Step 1/3: Importing recent data from APIs...');
@@ -84,15 +111,42 @@ class IncrementalDataSync extends Command
         }
         $this->newLine();
 
-        // Step 4: Update sync timestamp
-        DB::table('sync_metadata')->updateOrInsert(
-            ['key' => 'last_incremental_sync'],
-            ['value' => now()->toDateTimeString(), 'updated_at' => now()]
-        );
+            // Step 4: Update sync timestamp
+            DB::table('sync_metadata')->updateOrInsert(
+                ['key' => 'last_incremental_sync'],
+                ['value' => now()->toDateTimeString(), 'updated_at' => now()]
+            );
 
-        $duration = now()->diffInSeconds($startTime);
-        $this->info("✅ Incremental sync completed in {$duration} seconds!");
+            $duration = now()->diffInSeconds($startTime);
 
-        return self::SUCCESS;
+            // Update sync log with success
+            DB::table('sync_logs')->where('id', $logId)->update([
+                'status' => 'success',
+                'completed_at' => now(),
+                'duration_seconds' => $duration,
+                'details' => json_encode([
+                    'days_fetched' => $daysToFetch,
+                    'last_sync_was' => $lastSync,
+                ]),
+                'updated_at' => now(),
+            ]);
+
+            $this->info("✅ Incremental sync completed in {$duration} seconds!");
+
+            return self::SUCCESS;
+
+        } catch (\Exception $e) {
+            // Log the error
+            DB::table('sync_logs')->where('id', $logId)->update([
+                'status' => 'failed',
+                'completed_at' => now(),
+                'duration_seconds' => now()->diffInSeconds($startTime),
+                'error_message' => $e->getMessage(),
+                'updated_at' => now(),
+            ]);
+
+            $this->error('❌ Sync failed: ' . $e->getMessage());
+            return self::FAILURE;
+        }
     }
 }
