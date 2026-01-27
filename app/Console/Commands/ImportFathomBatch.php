@@ -8,12 +8,13 @@ use Illuminate\Support\Facades\Artisan;
 
 class ImportFathomBatch extends Command
 {
-    protected $signature = 'fathom:import-all {--days=365 : Number of days to import}';
+    protected $signature = 'fathom:import-all {--days=365 : Number of days to import} {--hourly : Use hourly granularity instead of daily}';
     protected $description = 'Import Fathom data for all sites with rate limiting (10 req/min)';
 
     public function handle(): int
     {
         $days = $this->option('days');
+        $hourly = $this->option('hourly');
 
         // Get all site IDs
         $sites = DB::table('sites')
@@ -22,8 +23,11 @@ class ImportFathomBatch extends Command
             ->get();
 
         $total = $sites->count();
-        $this->info("Importing {$days} days of data for {$total} sites...");
-        $this->info("Rate limit: 10 requests/min (6 seconds between sites)");
+        $granularity = $hourly ? 'hourly' : 'daily';
+        $this->info("Importing {$days} days of {$granularity} data for {$total} sites...");
+        // Hourly only does 1 request per site (no pathname), daily does 2
+        $sleepTime = $hourly ? 6 : 12;
+        $this->info("Rate limit: 10 requests/min ({$sleepTime} seconds between sites)");
         $this->newLine();
 
         $bar = $this->output->createProgressBar($total);
@@ -31,17 +35,20 @@ class ImportFathomBatch extends Command
 
         foreach ($sites as $index => $site) {
             // Rate limiting: 10 req/min = 1 request per 6 seconds
-            // Each site does 2 requests (total + pathname)
-            // So we wait 12 seconds between sites
+            // Daily does 2 requests (total + pathname), hourly does 1
             if ($index > 0) {
-                sleep(12);
+                sleep($sleepTime);
             }
 
             try {
-                Artisan::call('fathom:import', [
+                $args = [
                     'site_id' => $site->fathom_site_id,
                     '--days' => $days
-                ]);
+                ];
+                if ($hourly) {
+                    $args['--hourly'] = true;
+                }
+                Artisan::call('fathom:import', $args);
 
                 $bar->advance();
 
@@ -56,10 +63,7 @@ class ImportFathomBatch extends Command
 
                     // Retry once
                     try {
-                        Artisan::call('fathom:import', [
-                            'site_id' => $site->fathom_site_id,
-                            '--days' => $days
-                        ]);
+                        Artisan::call('fathom:import', $args);
                         $this->info("✓ Retry successful");
                         $bar->advance();
                     } catch (\Exception $retryError) {
@@ -78,7 +82,7 @@ class ImportFathomBatch extends Command
         $this->info('✓ Import completed');
 
         // Estimate completion time
-        $minutes = ceil(($total * 12) / 60);
+        $minutes = ceil(($total * $sleepTime) / 60);
         $this->info("Total time: ~{$minutes} minutes");
 
         return self::SUCCESS;

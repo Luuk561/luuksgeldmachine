@@ -19,32 +19,41 @@ class FathomDataSync extends Command
         $this->newLine();
 
         // Step 1: Import Fathom data (today only)
-        $this->info('📥 Step 1/3: Importing Fathom data...');
+        $this->info('📥 Step 1/4: Importing Fathom data...');
 
-        $this->line('   → Pageviews (today)...');
+        $this->line('   → Pageviews daily (today)...');
         $this->call('fathom:import-all', ['--days' => 1]);
+
+        $this->line('   → Pageviews hourly (today)...');
+        $this->call('fathom:import-all', ['--days' => 1, '--hourly' => true]);
 
         $this->line('   → Events/clicks (today)...');
         $this->call('fathom:import-event-data', ['--days' => 1]);
         $this->newLine();
 
         // Step 2: Enrich Fathom data
-        $this->info('🔍 Step 2/3: Enriching Fathom data...');
+        $this->info('🔍 Step 2/4: Enriching Fathom data...');
 
-        $this->line('   → Enriching pageviews...');
+        $this->line('   → Enriching pageviews (daily)...');
         $this->call('fathom:enrich-pageviews');
 
-        $this->line('   → Enriching site totals...');
+        $this->line('   → Enriching pageviews (hourly)...');
+        $this->call('fathom:enrich-pageviews-hourly');
+
+        $this->line('   → Enriching site totals (daily)...');
         $this->call('fathom:enrich-totals');
+
+        $this->line('   → Enriching site totals (hourly)...');
+        $this->call('fathom:enrich-hourly');
 
         $this->line('   → Enriching events...');
         $this->call('fathom:enrich-events');
         $this->newLine();
 
         // Step 3: Re-aggregate metrics
-        $this->info('📊 Step 3/3: Re-aggregating metrics...');
+        $this->info('📊 Step 3/4: Re-aggregating metrics...');
 
-        $periods = ['daily', '7d', '30d', '90d'];
+        $periods = ['hourly', 'daily', '7d', '30d', '90d'];
 
         foreach ($periods as $period) {
             $this->line("   → Updating {$period}...");

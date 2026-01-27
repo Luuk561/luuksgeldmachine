@@ -13,11 +13,68 @@ class DashboardController extends Controller
         $statusFilter = $this->getStatusFilterKey($request);
 
         // Prepare metrics for all periods
-        $periods = ['7d' => 7, '30d' => 30, '90d' => 90, '365d' => 365, 'all-time' => null];
+        $periods = ['1d' => 1, '7d' => 7, '30d' => 30, '90d' => 90, '365d' => 365, 'all-time' => null];
         $metricsData = [];
         $dailyMetricsData = [];
+        $hourlyMetricsData = [];
 
         foreach ($periods as $periodKey => $days) {
+            // Special handling for 1d (hourly data)
+            if ($periodKey === '1d') {
+                $today = today()->format('Y-m-d');
+
+                // Get hourly metrics for chart (24 hours)
+                $hourlyData = DB::table('metrics_hourly')
+                    ->where('date', $today)
+                    ->whereNull('site_id') // Global metrics
+                    ->where('status_filter', $statusFilter)
+                    ->orderBy('hour', 'asc')
+                    ->get();
+
+                // Fill missing hours with zeros
+                $completeHourlyData = collect();
+                for ($hour = 0; $hour < 24; $hour++) {
+                    $metrics = $hourlyData->firstWhere('hour', $hour);
+                    if ($metrics) {
+                        $completeHourlyData->push($metrics);
+                    } else {
+                        // Calculate real-time for current/future hours if no data
+                        $completeHourlyData->push((object)[
+                            'date' => $today,
+                            'hour' => $hour,
+                            'commission' => 0,
+                            'orders' => 0,
+                            'clicks' => 0,
+                            'pageviews' => 0,
+                            'visitors' => 0,
+                            'visits' => 0,
+                            'rpv' => 0,
+                            'conversion_rate' => 0,
+                        ]);
+                    }
+                }
+
+                $hourlyMetricsData[$periodKey] = $completeHourlyData;
+
+                // Calculate totals for today from hourly data
+                $metricsData[$periodKey] = (object)[
+                    'commission' => $completeHourlyData->sum('commission'),
+                    'orders' => $completeHourlyData->sum('orders'),
+                    'clicks' => $completeHourlyData->sum('clicks'),
+                    'pageviews' => $completeHourlyData->sum('pageviews'),
+                    'visitors' => $completeHourlyData->sum('visitors'),
+                    'visits' => $completeHourlyData->sum('visits'),
+                    'rpv' => $completeHourlyData->sum('visitors') > 0
+                        ? $completeHourlyData->sum('commission') / $completeHourlyData->sum('visitors')
+                        : 0,
+                    'conversion_rate' => $completeHourlyData->sum('clicks') > 0
+                        ? ($completeHourlyData->sum('orders') / $completeHourlyData->sum('clicks')) * 100
+                        : 0,
+                ];
+
+                continue;
+            }
+
             // Get pre-computed aggregated metrics
             $metricsData[$periodKey] = DB::table('metrics_global')
                 ->where('period_type', $periodKey)
@@ -101,6 +158,55 @@ class DashboardController extends Controller
         $worstSitesData = [];
 
         foreach (array_keys($periods) as $periodKey) {
+            // Special handling for 1d - aggregate from hourly data
+            if ($periodKey === '1d') {
+                $today = today()->format('Y-m-d');
+
+                // Aggregate hourly data per site for today
+                $topSitesData[$periodKey] = DB::table('metrics_hourly')
+                    ->join('sites', 'metrics_hourly.site_id', '=', 'sites.id')
+                    ->where('metrics_hourly.date', $today)
+                    ->whereNotNull('metrics_hourly.site_id')
+                    ->where('status_filter', $statusFilter)
+                    ->groupBy('metrics_hourly.site_id', 'sites.name', 'sites.domain')
+                    ->selectRaw('
+                        sites.name,
+                        sites.domain,
+                        metrics_hourly.site_id,
+                        SUM(commission) as commission,
+                        SUM(orders) as orders,
+                        SUM(visitors) as visitors,
+                        SUM(clicks) as clicks,
+                        CASE WHEN SUM(visitors) > 0 THEN SUM(commission) / SUM(visitors) ELSE 0 END as rpv
+                    ')
+                    ->orderBy('commission', 'desc')
+                    ->limit(5)
+                    ->get();
+
+                $worstSitesData[$periodKey] = DB::table('metrics_hourly')
+                    ->join('sites', 'metrics_hourly.site_id', '=', 'sites.id')
+                    ->where('metrics_hourly.date', $today)
+                    ->whereNotNull('metrics_hourly.site_id')
+                    ->where('status_filter', $statusFilter)
+                    ->groupBy('metrics_hourly.site_id', 'sites.name', 'sites.domain')
+                    ->havingRaw('SUM(visitors) > 0')
+                    ->selectRaw('
+                        sites.name,
+                        sites.domain,
+                        metrics_hourly.site_id,
+                        SUM(commission) as commission,
+                        SUM(orders) as orders,
+                        SUM(visitors) as visitors,
+                        SUM(clicks) as clicks,
+                        CASE WHEN SUM(visitors) > 0 THEN SUM(commission) / SUM(visitors) ELSE 0 END as rpv
+                    ')
+                    ->orderBy('rpv', 'asc')
+                    ->limit(5)
+                    ->get();
+
+                continue;
+            }
+
             // Get the latest date for this period type
             $latestDate = DB::table('metrics_site')
                 ->where('period_type', $periodKey)
@@ -151,7 +257,7 @@ class DashboardController extends Controller
             'last_log' => $lastSyncLog,
         ];
 
-        return view('dashboard', compact('metricsData', 'dailyMetricsData', 'topSitesData', 'worstSitesData', 'sites', 'dataFreshness'));
+        return view('dashboard', compact('metricsData', 'dailyMetricsData', 'hourlyMetricsData', 'topSitesData', 'worstSitesData', 'sites', 'dataFreshness'));
     }
 
     private function calculateTodayMetrics(string $statusFilter): object

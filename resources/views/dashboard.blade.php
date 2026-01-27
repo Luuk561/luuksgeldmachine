@@ -23,6 +23,7 @@
             return statusParams.length > 0 ? statusParams : ['Geaccepteerd', 'Open'];
         })(),
         periods: {
+            '1d': { label: '1d' },
             '7d': { label: '7d' },
             '30d': { label: '30d' },
             '90d': { label: '90d' },
@@ -104,10 +105,14 @@
             </div>
         </div>
 
-        @foreach(['7d', '30d', '90d', '365d', 'all-time'] as $periodKey)
+        @foreach(['1d', '7d', '30d', '90d', '365d', 'all-time'] as $periodKey)
         <div x-show="period === '{{ $periodKey }}'" x-transition x-cloak>
             @php
                 $metrics = $metricsData[$periodKey] ?? null;
+                // For 1d, use hourly data; for others, use daily data
+                $chartData = $periodKey === '1d'
+                    ? ($hourlyMetricsData[$periodKey] ?? collect())
+                    : ($dailyMetricsData[$periodKey] ?? collect());
                 $dailyData = $dailyMetricsData[$periodKey] ?? collect();
             @endphp
 
@@ -195,9 +200,11 @@
                         </div>
                     </div>
 
-                    <!-- RPV & Average per Day Row -->
+                    <!-- RPV & Average per Day/Hour Row -->
                     @php
-                        $days = match($periodKey) {
+                        $isHourly = $periodKey === '1d';
+                        $divisor = match($periodKey) {
+                            '1d' => now()->hour + 1, // Hours passed today (1-24)
                             '7d' => 7,
                             '30d' => 30,
                             '90d' => 90,
@@ -205,7 +212,8 @@
                             'all-time' => $dailyData->count(),
                             default => 30
                         };
-                        $avgPerDay = $days > 0 ? $metrics->commission / $days : 0;
+                        $avgValue = $divisor > 0 ? $metrics->commission / $divisor : 0;
+                        $avgLabel = $isHourly ? 'Gem. per Uur' : 'Gem. per Dag';
                     @endphp
                     <div class="grid grid-cols-2 gap-3 sm:gap-4">
                         <div class="bg-[#252839] backdrop-blur-light rounded-xl p-3 sm:p-4 shadow-lg border border-slate-700/20">
@@ -213,8 +221,8 @@
                             <p class="text-2xl sm:text-3xl font-light text-white">€{{ number_format($metrics->rpv, 3, '.', '') }}</p>
                         </div>
                         <div class="bg-[#252839] backdrop-blur-light rounded-xl p-3 sm:p-4 shadow-lg border border-slate-700/20">
-                            <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Gem. per Dag</p>
-                            <p class="text-2xl sm:text-3xl font-light text-white">€{{ number_format($avgPerDay, 2, '.', '') }}</p>
+                            <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">{{ $avgLabel }}</p>
+                            <p class="text-2xl sm:text-3xl font-light text-white">€{{ number_format($avgValue, 2, '.', '') }}</p>
                         </div>
                     </div>
                 </div>
@@ -430,6 +438,12 @@
 
     </main>
 
+    @php
+        $hourlyData1d = $hourlyMetricsData['1d'] ?? collect();
+        $hourlyDates = $hourlyData1d->map(function($m) {
+            return str_pad($m->hour ?? 0, 2, '0', STR_PAD_LEFT) . ':00';
+        });
+    @endphp
     <script>
         // Get initial chart metric from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -438,6 +452,14 @@
         // Store chart instances
         const charts = {};
         const chartData = {
+            // 1d uses hourly data with hour labels
+            '1d': {
+                dates: @json($hourlyDates),
+                commission: @json($hourlyData1d->pluck('commission')),
+                visitors: @json($hourlyData1d->pluck('visitors')),
+                pageviews: @json($hourlyData1d->pluck('pageviews')),
+                clicks: @json($hourlyData1d->pluck('clicks'))
+            },
             @foreach(['7d', '30d', '90d', '365d', 'all-time'] as $periodKey)
             '{{ $periodKey }}': {
                 dates: @json($dailyMetricsData[$periodKey]->pluck('date') ?? []),
@@ -458,7 +480,7 @@
         };
 
         // Initialize charts
-        @foreach(['7d', '30d', '90d', '365d', 'all-time'] as $periodKey)
+        @foreach(['1d', '7d', '30d', '90d', '365d', 'all-time'] as $periodKey)
         (function() {
             const periodKey = '{{ $periodKey }}';
             const ctx = document.getElementById('chart-{{ $periodKey }}');

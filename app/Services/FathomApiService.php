@@ -36,7 +36,8 @@ class FathomApiService
         ?string $fieldGrouping = null,
         ?string $sortBy = null,
         int $limit = 1000,
-        ?string $dateGrouping = null
+        ?string $dateGrouping = null,
+        ?string $timezone = null
     ): array {
         $params = [
             'entity' => 'pageview',
@@ -49,6 +50,10 @@ class FathomApiService
 
         if ($dateGrouping) {
             $params['date_grouping'] = $dateGrouping;
+        }
+
+        if ($timezone) {
+            $params['timezone'] = $timezone;
         }
 
         if ($fieldGrouping) {

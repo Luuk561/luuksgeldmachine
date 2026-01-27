@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class AggregateMetrics extends Command
 {
-    protected $signature = 'metrics:aggregate {--period=daily : daily, 7d, 30d, 90d, 365d, or all-time}';
+    protected $signature = 'metrics:aggregate {--period=daily : daily, hourly, 7d, 30d, 90d, 365d, or all-time}';
     protected $description = 'Aggregate metrics from enriched data';
 
     public function handle(): int
@@ -18,6 +18,9 @@ class AggregateMetrics extends Command
         switch ($period) {
             case 'daily':
                 $this->aggregateDaily();
+                break;
+            case 'hourly':
+                $this->aggregateHourly();
                 break;
             case '7d':
                 $this->aggregateRolling(7);
@@ -35,12 +38,175 @@ class AggregateMetrics extends Command
                 $this->aggregateAllTime();
                 break;
             default:
-                $this->error("Invalid period. Use: daily, 7d, 30d, 90d, 365d, or all-time");
+                $this->error("Invalid period. Use: daily, hourly, 7d, 30d, 90d, 365d, or all-time");
                 return self::FAILURE;
         }
 
         $this->info("✓ Metrics aggregated");
         return self::SUCCESS;
+    }
+
+    private function aggregateHourly(): void
+    {
+        $today = now()->format('Y-m-d');
+        $statusFilters = $this->getStatusFilters();
+        $processed = 0;
+
+        foreach ($statusFilters as $filterKey => $statuses) {
+            // Aggregate global hourly metrics for today
+            for ($hour = 0; $hour < 24; $hour++) {
+                $this->aggregateGlobalForHour($today, $hour, $filterKey, $statuses);
+                $processed++;
+            }
+
+            // Aggregate per-site hourly metrics for today
+            $sites = DB::table('sites')->pluck('id');
+            foreach ($sites as $siteId) {
+                for ($hour = 0; $hour < 24; $hour++) {
+                    $this->aggregateSiteForHour($today, $hour, $siteId, $filterKey, $statuses);
+                }
+            }
+        }
+
+        $this->line("  Processed {$processed} hourly slots × " . \count($statusFilters) . " status filters");
+    }
+
+    private function aggregateGlobalForHour(string $date, int $hour, string $statusFilter, array $statuses): void
+    {
+        // Orders from enriched_orders using order_datetime (ISO 8601 format with 'T')
+        $hourStart = "{$date}T" . str_pad($hour, 2, '0', STR_PAD_LEFT) . ":00:00";
+        $hourEnd = "{$date}T" . str_pad($hour, 2, '0', STR_PAD_LEFT) . ":59:59";
+
+        $orderStats = DB::table('enriched_orders')
+            ->whereBetween('order_datetime', [$hourStart, $hourEnd])
+            ->whereIn('status', $statuses)
+            ->selectRaw('
+                COALESCE(SUM(commission), 0) as total_commission,
+                COUNT(*) as total_orders
+            ')
+            ->first();
+
+        // Manual commissions don't have hour granularity, so we skip them for hourly
+
+        $commission = $orderStats->total_commission ?? 0;
+        $orders = $orderStats->total_orders ?? 0;
+
+        // Get visitors from hourly Fathom data
+        $siteStats = DB::table('enriched_site_totals_hourly')
+            ->where('date', $date)
+            ->where('hour', $hour)
+            ->selectRaw('
+                COALESCE(SUM(uniques), 0) as total_visitors,
+                COALESCE(SUM(visits), 0) as total_visits
+            ')
+            ->first();
+
+        $visitors = $siteStats->total_visitors ?? 0;
+        $visits = $siteStats->total_visits ?? 0;
+
+        // Get pageviews from hourly pageview data
+        $pageviewStats = DB::table('enriched_pageviews_hourly')
+            ->where('date', $date)
+            ->where('hour', $hour)
+            ->selectRaw('COALESCE(SUM(pageviews), 0) as total_pageviews')
+            ->first();
+
+        $pageviews = $pageviewStats->total_pageviews ?? 0;
+
+        // Get clicks from hourly click aggregates
+        $clickStats = DB::table('enriched_click_aggregates_hourly')
+            ->where('date', $date)
+            ->where('hour', $hour)
+            ->selectRaw('COALESCE(SUM(clicks), 0) as total_clicks')
+            ->first();
+
+        $clicks = $clickStats->total_clicks ?? 0;
+
+        $rpv = $visitors > 0 ? $commission / $visitors : 0;
+        $conversionRate = $clicks > 0 ? ($orders / $clicks) * 100 : 0;
+
+        DB::table('metrics_hourly')->updateOrInsert(
+            ['date' => $date, 'hour' => $hour, 'site_id' => null, 'status_filter' => $statusFilter],
+            [
+                'commission' => $commission,
+                'orders' => $orders,
+                'clicks' => $clicks,
+                'pageviews' => $pageviews,
+                'visitors' => $visitors,
+                'visits' => $visits,
+                'rpv' => $rpv,
+                'conversion_rate' => $conversionRate,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+    }
+
+    private function aggregateSiteForHour(string $date, int $hour, int $siteId, string $statusFilter, array $statuses): void
+    {
+        $hourStart = "{$date}T" . str_pad($hour, 2, '0', STR_PAD_LEFT) . ":00:00";
+        $hourEnd = "{$date}T" . str_pad($hour, 2, '0', STR_PAD_LEFT) . ":59:59";
+
+        $orderStats = DB::table('enriched_orders')
+            ->whereBetween('order_datetime', [$hourStart, $hourEnd])
+            ->where('site_id', $siteId)
+            ->whereIn('status', $statuses)
+            ->selectRaw('
+                COALESCE(SUM(commission), 0) as total_commission,
+                COUNT(*) as total_orders
+            ')
+            ->first();
+
+        $commission = $orderStats->total_commission ?? 0;
+        $orders = $orderStats->total_orders ?? 0;
+
+        $siteStats = DB::table('enriched_site_totals_hourly')
+            ->where('date', $date)
+            ->where('hour', $hour)
+            ->where('site_id', $siteId)
+            ->first();
+
+        $visitors = $siteStats->uniques ?? 0;
+        $visits = $siteStats->visits ?? 0;
+
+        // Get pageviews for this site and hour
+        $pageviewStats = DB::table('enriched_pageviews_hourly')
+            ->where('date', $date)
+            ->where('hour', $hour)
+            ->where('site_id', $siteId)
+            ->selectRaw('COALESCE(SUM(pageviews), 0) as total_pageviews')
+            ->first();
+
+        $pageviews = $pageviewStats->total_pageviews ?? 0;
+
+        // Get clicks for this site and hour
+        $clickStats = DB::table('enriched_click_aggregates_hourly')
+            ->where('date', $date)
+            ->where('hour', $hour)
+            ->where('site_id', $siteId)
+            ->selectRaw('COALESCE(SUM(clicks), 0) as total_clicks')
+            ->first();
+
+        $clicks = $clickStats->total_clicks ?? 0;
+
+        $rpv = $visitors > 0 ? $commission / $visitors : 0;
+        $conversionRate = 0;
+
+        DB::table('metrics_hourly')->updateOrInsert(
+            ['date' => $date, 'hour' => $hour, 'site_id' => $siteId, 'status_filter' => $statusFilter],
+            [
+                'commission' => $commission,
+                'orders' => $orders,
+                'clicks' => $clicks,
+                'pageviews' => $pageviews,
+                'visitors' => $visitors,
+                'visits' => $visits,
+                'rpv' => $rpv,
+                'conversion_rate' => $conversionRate,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
     }
 
     private function aggregateDaily(): void
@@ -88,7 +254,7 @@ class AggregateMetrics extends Command
     private function aggregateRolling(int $days): void
     {
         $endDate = now()->format('Y-m-d');
-        $startDate = now()->subDays($days)->format('Y-m-d');
+        $startDate = now()->subDays($days - 1)->format('Y-m-d');
         $periodType = "{$days}d";
 
         $statusFilters = $this->getStatusFilters();
